@@ -1,8 +1,13 @@
 const express = require("express");
 const router = express.Router();
-const bookingController = require("../controllers/bookingController");
+const {
+  createBooking,
+  getBookings,
+  getUserBookings,
+} = require("../controllers/bookingController");
 
-router.get("/", bookingController.getBookings);
-router.post("/", bookingController.createBooking);
+router.post("/", createBooking); // Book a slot
+router.get("/", getBookings); // All bookings (admin)
+router.get("/user/:userId", getUserBookings); //user-specific
 
 module.exports = router;
