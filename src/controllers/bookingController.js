@@ -16,38 +16,34 @@ exports.createBooking = async (req, res) => {
       return res.status(400).json({ error: "Invalid time range" });
     }
 
+    if (endHour - startHour !== 1) {
+      return res.status(400).json({ error: "Booking must be exactly 1 hour" });
+    }
+
     const court = await Court.findById(courtId);
     if (!court) return res.status(404).json({ error: "Court not found" });
 
-    // Opening hours check
     if (startHour < court.opensAt || endHour > court.closesAt) {
       return res.status(400).json({
-        error: `Court open between ${court.opensAt} and ${court.closesAt}`,
+        error: `Court is open between ${court.opensAt} and ${court.closesAt}`,
       });
     }
 
+    // 6️⃣ Convert to UTC
     const slotStart = toUTC(date, startHour);
     const slotEnd = toUTC(date, endHour);
 
-    // OVERLAP CHECK
+    // 7️⃣ Check for overlapping bookings
     const overlapping = await Booking.findOne({
       courtId,
-      $or: [
-        { slotStart: { $lt: slotEnd, $gte: slotStart } },
-        { slotEnd: { $gt: slotStart, $lte: slotEnd } },
-        {
-          $and: [
-            { slotStart: { $lte: slotStart } },
-            { slotEnd: { $gte: slotEnd } },
-          ],
-        },
-      ],
+      slotStart: { $lt: slotEnd, $gte: slotStart },
     });
 
     if (overlapping) {
       return res.status(409).json({ error: "Selected time is already booked" });
     }
 
+    // 8️⃣ Create booking
     const booking = await Booking.create({
       userId,
       courtId,
@@ -55,6 +51,7 @@ exports.createBooking = async (req, res) => {
       slotEnd,
     });
 
+    // 9️⃣ Respond with booking details
     res.status(201).json({
       success: true,
       booking: {
@@ -67,7 +64,7 @@ exports.createBooking = async (req, res) => {
           .format("h A")} - ${moment(slotEnd)
           .tz("Asia/Kathmandu")
           .format("h A")}`,
-        status: booking.status,
+        status: booking.status || "confirmed",
       },
     });
   } catch (err) {
@@ -141,5 +138,51 @@ exports.getUserBookings = async (req, res) => {
       error: "Failed to fetch user bookings",
       details: err.message,
     });
+  }
+};
+
+exports.getAdminBookingsByDate = async (req, res) => {
+  try {
+    const { courtId } = req.params;
+    const { date } = req.query;
+
+    if (!date) {
+      return res
+        .status(400)
+        .json({ error: "Date is required in YYYY-MM-DD format" });
+    }
+
+    // Filter by courtId if provided
+    const courtFilter = courtId ? { courtId } : {};
+
+    // Convert date to UTC range for the day
+    const startOfDay = toUTC(date, 0);
+    const endOfDay = toUTC(date, 24);
+
+    const bookings = await Booking.find({
+      ...courtFilter,
+      slotStart: { $gte: startOfDay, $lt: endOfDay },
+    })
+      .populate("userId", "name email")
+      .populate("courtId", "name");
+
+    // Map into a readable format
+    const result = bookings.map((b) => ({
+      court: b.courtId.name,
+      startTime: moment(b.slotStart).tz("Asia/Kathmandu").format("h A"),
+      endTime: moment(b.slotEnd).tz("Asia/Kathmandu").format("h A"),
+      userName: b.userId.name,
+      userEmail: b.userId.email,
+    }));
+
+    res.json({
+      success: true,
+      date,
+      bookings: result,
+    });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ error: "Failed to fetch bookings", details: err.message });
   }
 };
