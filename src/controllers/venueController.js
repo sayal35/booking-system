@@ -29,3 +29,13 @@ exports.getVenuesBySport = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// Get all venues
+exports.getAllVenues = async (req, res) => {
+  try {
+    const venues = await Venue.find();
+    res.json({ success: true, venues });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
