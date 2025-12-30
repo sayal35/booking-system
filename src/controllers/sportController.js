@@ -2,8 +2,15 @@ const Sport = require("../models/Sport");
 
 exports.createSport = async (req, res) => {
   try {
-    const sport = await Sport.create(req.body);
-    res.status(201).json(sport);
+    const { name, type } = req.body;
+
+    const sport = await Sport.create({
+      name,
+      type,
+      image: req.file ? `/uploads/sports/${req.file.filename}` : null,
+    });
+
+    res.status(201).json({ success: true, sport });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
