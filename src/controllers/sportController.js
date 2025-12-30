@@ -2,13 +2,13 @@ const Sport = require("../models/Sport");
 
 exports.createSport = async (req, res) => {
   try {
-    const { name, type } = req.body;
+    const { name, type, image } = req.body;
 
-    const sport = await Sport.create({
-      name,
-      type,
-      image: req.file ? `/uploads/sports/${req.file.filename}` : null,
-    });
+    if (!name || !type || !image) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    const sport = await Sport.create({ name, type, image });
 
     res.status(201).json({ success: true, sport });
   } catch (err) {
